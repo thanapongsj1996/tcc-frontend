@@ -20,13 +20,17 @@ import {
   RadioGroup,
   Stack,
 } from "@chakra-ui/react";
+import { useAuthStore } from "@/store/app.store";
 
 export default function Home() {
+  const user = useAuthStore((state: any) => state.user);
+
   const [value, setValue] = useState("1");
   return (
     <main className="flex min-h-screen flex-col items-center p-24">
       <h1 className="text-4xl font-bold">{32} s</h1>
       <Box pt={"20px"} justifyContent={"center"}>
+        {user?.fullname}
         <RadioGroup onChange={setValue} value={value}>
           <Stack direction="row">
             <Radio value="1">1 Digit</Radio>
