@@ -2,9 +2,9 @@
 import axios from "axios";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Box, Button, Link, Text, textDecoration } from "@chakra-ui/react";
+import { Avatar, Box, Button, Link, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { useAuthStore } from "@/store/app.store";
+import { useAuthStore, useCreditStore } from "@/store/app.store";
 
 export default function RootLayout({
   children,
@@ -13,6 +13,7 @@ export default function RootLayout({
 }) {
   const [isLogin, setIsLogin] = useState(false);
   const [user, setUser] = useState<any>({});
+  const [credit, setCredit] = useState<any>(0);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -26,13 +27,23 @@ export default function RootLayout({
           },
         })
         .then((res) => {
-          setUser(res.data.user);
-          useAuthStore.setState({ user: res.data.user });
-        });
+          const user = res.data.user;
+          setUser(user);
+          useAuthStore.setState({ user: user });
 
-      // axios
-      //   .get(process.env.NEXT_PUBLIC_AUTH_URL + "/api/v1/auth/profile", {})
-      //   .then((res) => {});
+          axios
+            .get(
+              process.env.NEXT_PUBLIC_CREDIT_URL + `/api/v1/credit/${user.id}`,
+              {}
+            )
+            .then((res) => {
+              const credit = parseInt(res.data.credit);
+              useCreditStore.setState({ credit: credit });
+              console.log("credit: ", credit);
+              setCredit(credit);
+            });
+          console.log(user.id);
+        });
     } else {
       setIsLogin(false);
     }
@@ -66,8 +77,16 @@ export default function RootLayout({
             <Box display={"flex"} alignItems={"center"}>
               {isLogin && (
                 <>
+                  <Avatar mr={1} size={"sm"} />
                   <Text mr={2}>{user.fullname} | </Text>
-                  <Text mr={2}>120 Credits</Text>
+                  <Text mr={2}>{credit} Credits</Text>
+                  <Button
+                    onClick={() => window.location.reload()}
+                    mr={4}
+                    colorScheme="green"
+                  >
+                    Refresh
+                  </Button>
                   <Link mr={2} href={"/login"}>
                     <Button onClick={() => onLogout()}>Logout</Button>
                   </Link>
