@@ -19,14 +19,17 @@ import {
 } from "@chakra-ui/react";
 import { useAuthStore, useCreditStore } from "@/store/app.store";
 import { MdCancel, MdCheckCircle } from "react-icons/md";
+import axios from "axios";
 
 export default function Home() {
   const user = useAuthStore((state: any) => state.user);
   const credit = useCreditStore((state: any) => state.credit);
   const [seconds, setSeconds] = useState(0);
   const [amount, setAmount] = useState(0);
-  const [number, setNumber] = useState(0);
+  const [number, setNumber] = useState("");
   const [digit, setDigit] = useState("1");
+  const [rewardHistory, setRewardHistory] = useState<any[]>([]);
+  const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const updateSeconds = () => {
@@ -40,32 +43,66 @@ export default function Home() {
     return () => clearInterval(intervalId);
   }, []);
 
+  useEffect(() => {
+    axios
+      .get(process.env.NEXT_PUBLIC_LOTTO_URL + "/api/v1/lotto/reward-history", {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+      .then((res) => {
+        setRewardHistory(res.data);
+      });
+
+    if (user) {
+      axios
+        .get(
+          process.env.NEXT_PUBLIC_LOTTO_URL +
+            "/api/v1/lotto/purchase-history/" +
+            user.id,
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
+        .then((res) => {
+          setPurchaseHistory(res.data);
+          console.log(res.data);
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      axios
+        .get(
+          process.env.NEXT_PUBLIC_LOTTO_URL +
+            "/api/v1/lotto/purchase-history/" +
+            user.id,
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
+        .then((res) => {
+          setPurchaseHistory(res.data);
+        });
+    }
+  }, [user]);
+
   const onSubmit = () => {
     if (!user) {
       alert("Please login");
       return;
     }
 
-    if (number < 0) {
-      alert("Number must be positive");
+    // check number is string contains only number with regex
+    const regex = new RegExp("^[0-9]+$");
+    if (!regex.test(number)) {
+      alert("Number must be a number");
       return;
-    }
-
-    if (digit === "1") {
-      if (number > 9) {
-        alert("Number must be less than 10");
-        return;
-      }
-    } else if (digit === "2") {
-      if (number > 99) {
-        alert("Number must be less than 100");
-        return;
-      }
-    } else if (digit === "3") {
-      if (number > 999) {
-        alert("Number must be less than 1000");
-        return;
-      }
     }
 
     if (amount < 0) {
@@ -78,7 +115,41 @@ export default function Home() {
       return;
     }
 
-    alert("ok");
+    let body = {} as any;
+    if (digit === "1") {
+      body = {
+        oneDigit: number.toString(),
+        oneDigitAmount: amount,
+      };
+    } else if (digit === "2") {
+      body = {
+        twoDigit: number.toString(),
+        twoDigitAmount: amount,
+      };
+    } else if (digit === "3") {
+      body = {
+        threeDigit: number.toString(),
+        threeDigitAmount: amount,
+      };
+    }
+
+    body["userId"] = user.id;
+    console.log(body);
+
+    axios
+      .post(
+        process.env.NEXT_PUBLIC_LOTTO_URL + "/api/v1/lotto/purchase",
+        body,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      )
+      .then((res) => {
+        alert("Purchase success");
+        window.location.reload();
+      });
   };
 
   return (
@@ -101,8 +172,7 @@ export default function Home() {
         </RadioGroup>
         <Input
           mt={3}
-          onChange={(e) => setNumber(+e.target.value)}
-          type="number"
+          onChange={(e) => setNumber(e.target.value)}
           placeholder="Number"
         />
         <Input
@@ -125,35 +195,19 @@ export default function Home() {
               <Tr>
                 <Th isNumeric>1 Digit</Th>
                 <Th isNumeric>2 Digits</Th>
-                <Th isNumeric>2 Digits</Th>
+                <Th isNumeric>3 Digits</Th>
                 <Th>Round</Th>
               </Tr>
             </Thead>
             <Tbody>
-              <Tr>
-                <Td textAlign={"center"}>1</Td>
-                <Td textAlign={"center"}>12</Td>
-                <Td textAlign={"center"}>123</Td>
-                <Td textAlign={"center"}>12 Dec 23 15:25</Td>
-              </Tr>
-              <Tr>
-                <Td textAlign={"center"}>1</Td>
-                <Td textAlign={"center"}>12</Td>
-                <Td textAlign={"center"}>123</Td>
-                <Td textAlign={"center"}>12 Dec 23 15:24</Td>
-              </Tr>
-              <Tr>
-                <Td textAlign={"center"}>1</Td>
-                <Td textAlign={"center"}>12</Td>
-                <Td textAlign={"center"}>123</Td>
-                <Td textAlign={"center"}>12 Dec 23 15:23</Td>
-              </Tr>
-              <Tr>
-                <Td textAlign={"center"}>1</Td>
-                <Td textAlign={"center"}>12</Td>
-                <Td textAlign={"center"}>123</Td>
-                <Td textAlign={"center"}>12 Dec 23 15:22</Td>
-              </Tr>
+              {rewardHistory.map((item) => (
+                <Tr key={item.label}>
+                  <Td textAlign={"center"}>{item?.oneDigit}</Td>
+                  <Td textAlign={"center"}>{item?.twoDigit}</Td>
+                  <Td textAlign={"center"}>{item?.threeDigit}</Td>
+                  <Td textAlign={"center"}>{item?.id}</Td>
+                </Tr>
+              ))}
             </Tbody>
           </Table>
         </TableContainer>
@@ -174,22 +228,49 @@ export default function Home() {
                 </Tr>
               </Thead>
               <Tbody>
-                <Tr>
-                  <Td textAlign={"center"}>
-                    <Icon color={"red"} as={MdCancel} />
-                  </Td>
-                  <Td textAlign={"center"}>12</Td>
-                  <Td textAlign={"center"}>123</Td>
-                  <Td textAlign={"center"}>12 Dec 23 15:25</Td>
-                </Tr>
-                <Tr>
+                {purchaseHistory.map((item) => (
+                  <>
+                    {item.oneDigit && (
+                      <Tr>
+                        <Td textAlign={"center"}>
+                          {/* <Icon color={"red"} as={MdCancel} /> */}-
+                        </Td>
+                        <Td textAlign={"center"}>{item.oneDigit}</Td>
+                        <Td textAlign={"center"}>{item.oneDigitAmount}</Td>
+                        <Td textAlign={"center"}>{item.prizeId}</Td>
+                      </Tr>
+                    )}
+                    {item.twoDigit && (
+                      <Tr>
+                        <Td textAlign={"center"}>
+                          {/* <Icon color={"red"} as={MdCancel} /> */}-
+                        </Td>
+                        <Td textAlign={"center"}>{item.twoDigit}</Td>
+                        <Td textAlign={"center"}>{item.twoDigitAmount}</Td>
+                        <Td textAlign={"center"}>{item.prizeId}</Td>
+                      </Tr>
+                    )}
+                    {item.threeDigit && (
+                      <Tr>
+                        <Td textAlign={"center"}>
+                          {/* <Icon color={"red"} as={MdCancel} /> */}-
+                        </Td>
+                        <Td textAlign={"center"}>{item.threeDigit}</Td>
+                        <Td textAlign={"center"}>{item.threeDigitAmount}</Td>
+                        <Td textAlign={"center"}>{item.prizeId}</Td>
+                      </Tr>
+                    )}
+                  </>
+                ))}
+
+                {/* <Tr>
                   <Td textAlign={"center"}>
                     <Icon color={"green"} as={MdCheckCircle} />
                   </Td>
                   <Td textAlign={"center"}>12</Td>
                   <Td textAlign={"center"}>123</Td>
                   <Td textAlign={"center"}>12 Dec 23 15:24</Td>
-                </Tr>
+                </Tr> */}
               </Tbody>
             </Table>
           </TableContainer>
